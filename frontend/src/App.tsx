@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BrowserRouter, Route, Routes, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from './components/ui/button'
 import { Label } from './components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
@@ -96,6 +96,7 @@ function Onboarding() {
     }
     setResult(data)
     // Navigate to analyze page with result in state
+    try { sessionStorage.setItem('shapmi:lastResult', JSON.stringify(data)) } catch {}
     navigate('/analyze', { state: { result: data } })
   }
 
@@ -260,9 +261,13 @@ function Onboarding() {
 }
 
 function Analyze() {
-  // Use router state to get result
-  const state = (window as any).history.state?.usr as any
-  const result = state?.result as {
+  // Prefer router state, fall back to session storage
+  const location = useLocation()
+  const fromState = (location.state as any)?.result
+  const persisted = fromState ? fromState : (() => {
+    try { return JSON.parse(sessionStorage.getItem('shapmi:lastResult') || 'null') } catch { return null }
+  })()
+  const result = persisted as {
     target: string
     total_mi: number
     contributions: { feature: string; value: number }[]
@@ -392,7 +397,7 @@ function MIBarChart({ data, mode, entropy }: { data: { feature: string; value: n
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={values} layout="vertical" margin={{ left: 20, right: 20 }}>
           <CartesianGrid vertical={false} strokeDasharray="0" stroke="#e5e7eb" />
-          <XAxis type="number" tick={{ fontSize: 10, fill: '#9CA3AF', fontWeight: 200 }} tickFormatter={(v) => mode === 'percent' ? `${Math.round(Number(v))}` : Number(v).toFixed(2)} />
+          <XAxis type="number" tick={{ fontSize: 10, fill: '#9CA3AF', fontWeight: 200 }} tickFormatter={(v) => mode === 'percent' ? `${Math.round(Number(v))}%` : Number(v).toFixed(2)} />
           <YAxis type="category" dataKey="feature" tick={{ fontSize: 10, fill: '#9CA3AF', fontWeight: 200 }} width={100} />
           <Tooltip
             cursor={{ fill: 'rgba(0,0,0,0.03)' }}
