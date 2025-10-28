@@ -276,11 +276,11 @@ function Analyze() {
     entropy_max?: number
   } | null
   const [mode, setMode] = useState<'absolute' | 'percent'>('percent')
-  const [activeNav, setActiveNav] = useState<'overview' | 'info'>('info')
+  const [activeNav, setActiveNav] = useState<'overview' | 'info' | 'dists'>('info')
 
   return (
     <div className="min-h-screen grid grid-cols-[240px_1fr] mx-16">
-      <aside className="bg-white">
+      <aside className="bg-white flex flex-col">
         <div className="h-14 border-b border-neutral-200 flex items-center px-16">
           <div className="flex items-center gap-2"><div className="h-5 w-5 rounded bg-neutral-900" /></div>
         </div>
@@ -298,6 +298,14 @@ function Analyze() {
             Info Decomp
           </button>
         </nav>
+        <div className="mt-auto px-16 py-4">
+          <button
+            className={(activeNav === 'dists' ? 'border-neutral-900 text-neutral-900 font-medium ' : 'text-neutral-700 hover:text-neutral-900 ') + 'pl-3 border-l-2 border-transparent w-full text-left text-sm font-light'}
+            onClick={() => setActiveNav('dists')}
+          >
+            Distributions
+          </button>
+        </div>
       </aside>
       <div className="min-h-screen bg-white">
         <div className="h-14 border-b border-neutral-200 px-16" />
@@ -344,7 +352,7 @@ function Analyze() {
                   <SpearmanHeatmap data={result?.spearman} />
                 </section>
               </>
-            ) : (
+            ) : activeNav === 'info' ? (
               <>
                 <section className="space-y-6">
                   <div>
@@ -375,6 +383,16 @@ function Analyze() {
                   <div className="w-full overflow-x-auto opacity-0 animate-[fadeIn_200ms_ease-out_forwards]">
                     <MIBarChart data={result?.contributions || []} mode={mode} entropy={result?.entropy} />
                   </div>
+                </section>
+              </>
+            ) : (
+              <>
+                <section className="space-y-6">
+                  <div>
+                    <h3 className="text-[1.1rem] font-medium text-neutral-900">Distributions</h3>
+                    <p className="text-sm font-light text-neutral-500">Assumed families and parameters (placeholders)</p>
+                  </div>
+                  <DistributionsTable result={result} />
                 </section>
               </>
             )}
@@ -433,6 +451,45 @@ export function App() {
   )
 }
 
+
+function DistributionsTable({ result }: { result: any }) {
+  const rows: { variable: string; type: 'categorical' | 'count' | 'continuous'; dist: string; params: string }[] = []
+  const order: string[] = (result?.spearman?.order as string[]) || []
+  for (const name of order) {
+    // Placeholder typing heuristic
+    const summary = result?.five_num?.[name]
+    let typ: 'categorical' | 'count' | 'continuous' = summary?.numeric ? 'continuous' : 'categorical'
+    if (summary?.numeric && Number.isFinite(summary?.min) && Math.abs((summary?.min ?? 0) - Math.round(summary?.min ?? 0)) < 1e-9) {
+      typ = 'count'
+    }
+    let dist = 'Categorical'
+    if (typ === 'count') dist = 'Poisson / NegBin'
+    if (typ === 'continuous') dist = 'Gaussian / Exp / Gamma / Lognormal / Lomax'
+    rows.push({ variable: name, type: typ, dist, params: '—' })
+  }
+  return (
+    <div className="w-full overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-neutral-500 font-light">
+            <th className="text-left py-2 pr-4 font-light">Variable</th>
+            <th className="text-left py-2 px-2 font-light">Distribution</th>
+            <th className="text-left py-2 px-2 font-light">Parameters</th>
+          </tr>
+        </thead>
+        <tbody className="align-top">
+          {rows.map(r => (
+            <tr key={r.variable} className={r.variable === result?.target ? 'text-neutral-900 font-medium' : 'text-neutral-700 font-light'}>
+              <td className={(r.variable === result?.target ? 'border-l-2 border-neutral-900 pl-2 ' : '') + 'py-2 pr-4'}>{r.variable}</td>
+              <td className="py-2 px-2">{r.dist}</td>
+              <td className="py-2 px-2">{r.params}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
 function FiveNum({ summaries, target }: { summaries?: Record<string, any> | null; target?: string }) {
   if (!summaries) return null
