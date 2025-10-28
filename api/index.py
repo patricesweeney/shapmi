@@ -6,6 +6,7 @@ import io
 import numpy as np
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 from sklearn.preprocessing import LabelEncoder
+import re
 
 try:
     from scipy.stats import entropy as scipy_entropy, differential_entropy
@@ -49,6 +50,57 @@ async def shapley_mi(
     file: UploadFile = File(...),
     target: str = Form(...),
 ):
+    def _prefilter_features(df: pd.DataFrame, feature_cols: list, target_col: str) -> list:
+        kept: list = []
+        n_rows = len(df)
+        name_regex = re.compile(r"(id|uuid|email|ssn|phone|guid|hash)", flags=re.IGNORECASE)
+        for name in feature_cols:
+            if name == target_col:
+                continue
+            s = df[name]
+            s_no_na = s.dropna()
+            if s_no_na.empty:
+                # All missing → drop
+                continue
+            # 1) Constant / near-constant
+            try:
+                top_ratio = float(s_no_na.value_counts(normalize=True).iloc[0])
+            except Exception:
+                top_ratio = 1.0
+            if s_no_na.nunique(dropna=True) <= 1 or top_ratio >= 0.99:
+                continue
+            # 2) Identifier-like: restrict to strings/object
+            if (pd.api.types.is_string_dtype(s) or s.dtype == object):
+                unique_ratio = float(s_no_na.nunique(dropna=True)) / float(len(s_no_na)) if len(s_no_na) else 0.0
+                if unique_ratio >= 0.9 or name_regex.search(name) is not None:
+                    continue
+            # 3) Free-form long text (strings)
+            if (pd.api.types.is_string_dtype(s) or s.dtype == object):
+                try:
+                    mean_len = float(s_no_na.astype(str).str.len().mean())
+                except Exception:
+                    mean_len = 0.0
+                unique_ratio_obj = float(s_no_na.nunique(dropna=True)) / float(len(s_no_na)) if len(s_no_na) else 0.0
+                if mean_len >= 80.0 and unique_ratio_obj >= 0.5:
+                    continue
+            # 4) Datetime stamps with high precision (mostly unique)
+            is_dt = pd.api.types.is_datetime64_any_dtype(s)
+            dt_valid_ratio = 0.0
+            if not is_dt and (pd.api.types.is_string_dtype(s) or s.dtype == object):
+                parsed = pd.to_datetime(s_no_na, errors="coerce", utc=False, infer_datetime_format=True)
+                dt_valid_ratio = float(parsed.notna().sum()) / float(len(s_no_na)) if len(s_no_na) else 0.0
+                is_dt = dt_valid_ratio >= 0.8
+            if is_dt:
+                uniq_ratio_dt = float(s_no_na.nunique(dropna=True)) / float(len(s_no_na)) if len(s_no_na) else 0.0
+                if uniq_ratio_dt >= 0.9:
+                    continue
+            # 5) Rare category columns: any level extremely rare → drop (strings/categoricals only)
+            if (pd.api.types.is_categorical_dtype(s) or pd.api.types.is_string_dtype(s) or s.dtype == object):
+                freqs = s_no_na.astype(str).value_counts(normalize=True)
+                if not freqs.empty and float(freqs.min()) < 0.005:
+                    continue
+            kept.append(name)
+        return kept
     content = await file.read()
     buffer = io.BytesIO(content)
     try:
@@ -63,6 +115,8 @@ async def shapley_mi(
         return JSONResponse(status_code=400, content={"error": f"Target '{target}' not found in columns"})
 
     feature_cols = [c for c in df.columns if c != target]
+    # Upfront feature drops (safe heuristics)
+    feature_cols = _prefilter_features(df, feature_cols, target)
 
     work = df[feature_cols + [target]].dropna()
     y_series = work[target]
