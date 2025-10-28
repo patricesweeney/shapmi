@@ -451,6 +451,7 @@ export function App() {
 
 
 function DistributionsTable({ result }: { result: any }) {
+  const [selectedByVar, setSelectedByVar] = useState<Record<string, string>>({})
   const rows: { variable: string; type: 'categorical' | 'count' | 'continuous'; dist: string; params: string }[] = []
   const order: string[] = (result?.spearman?.order as string[]) || []
   for (const name of order) {
@@ -460,10 +461,22 @@ function DistributionsTable({ result }: { result: any }) {
     if (summary?.numeric && Number.isFinite(summary?.min) && Math.abs((summary?.min ?? 0) - Math.round(summary?.min ?? 0)) < 1e-9) {
       typ = 'count'
     }
-    let dist = 'Categorical'
-    if (typ === 'count') dist = 'Poisson / NegBin'
-    if (typ === 'continuous') dist = 'Gaussian / Exp / Gamma / Lognormal / Lomax'
+    let dist = '—'
     rows.push({ variable: name, type: typ, dist, params: '—' })
+  }
+  const optionsForType = (t: 'categorical' | 'count' | 'continuous'): string[] => {
+    if (t === 'categorical') return ['Categorical']
+    if (t === 'count') return ['Poisson', 'Negative Binomial']
+    return ['Gaussian', 'Exponential', 'Gamma', 'Lognormal', 'Pareto II (Lomax)']
+  }
+  const chipClasses = (t: 'categorical' | 'count' | 'continuous', active: boolean) => {
+    const base = 'inline-flex items-center px-2.5 py-1 rounded-[999px] text-xs transition-colors duration-150 ease-in-out focus:outline-none'
+    const palette = t === 'continuous'
+      ? (active ? 'bg-blue-200 text-blue-900' : 'bg-blue-100 text-blue-800 hover:bg-blue-200')
+      : t === 'count'
+      ? (active ? 'bg-amber-200 text-amber-900' : 'bg-amber-100 text-amber-800 hover:bg-amber-200')
+      : (active ? 'bg-emerald-200 text-emerald-900' : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200')
+    return base + ' ' + palette
   }
   return (
     <div className="w-full overflow-x-auto">
@@ -476,13 +489,31 @@ function DistributionsTable({ result }: { result: any }) {
           </tr>
         </thead>
         <tbody className="align-top">
-          {rows.map(r => (
-            <tr key={r.variable} className={r.variable === result?.target ? 'text-neutral-900 font-medium' : 'text-neutral-700 font-light'}>
-              <td className={(r.variable === result?.target ? 'border-l-2 border-neutral-900 pl-2 ' : '') + 'py-2 pr-4'}>{r.variable}</td>
-              <td className="py-2 px-2">{r.dist}</td>
-              <td className="py-2 px-2">{r.params}</td>
-            </tr>
-          ))}
+          {rows.map(r => {
+            const opts = optionsForType(r.type)
+            const selected = selectedByVar[r.variable]
+            return (
+              <tr key={r.variable} className={r.variable === result?.target ? 'text-neutral-900 font-medium' : 'text-neutral-700 font-light'}>
+                <td className={(r.variable === result?.target ? 'border-l-2 border-neutral-900 pl-2 ' : '') + 'py-2 pr-4'}>{r.variable}</td>
+                <td className="py-2 px-2">
+                  <div className="flex flex-wrap gap-2">
+                    {opts.map(opt => (
+                      <button
+                        key={opt}
+                        type="button"
+                        aria-pressed={selected === opt}
+                        className={chipClasses(r.type, selected === opt)}
+                        onClick={() => setSelectedByVar(prev => ({ ...prev, [r.variable]: opt }))}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </td>
+                <td className="py-2 px-2">{r.params}</td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>
