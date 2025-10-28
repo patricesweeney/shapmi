@@ -237,6 +237,81 @@ async def shapley_mi(
         "matrix": corr.values.round(3).tolist(),
     }
 
+    # Method-of-moments parameter proposals per variable and distribution
+    def is_count_series(series: pd.Series) -> bool:
+        s = series.dropna()
+        if s.empty or not pd.api.types.is_numeric_dtype(s):
+            return False
+        arr = s.to_numpy()
+        if np.any(arr < 0):
+            return False
+        ints = np.isclose(arr, np.round(arr))
+        return float(ints.mean()) >= 0.999
+
+    def moments_numeric(series: pd.Series):
+        s = pd.to_numeric(series.dropna(), errors="coerce").dropna()
+        if s.empty:
+            return None
+        arr = s.to_numpy(dtype=float)
+        m = float(np.mean(arr))
+        v = float(np.var(arr))
+        mn = float(np.min(arr))
+        return m, v, mn
+
+    def dist_params_for(col: str, series: pd.Series):
+        params = {}
+        s = series.dropna()
+        # Categorical
+        if not pd.api.types.is_numeric_dtype(s):
+            vc = s.astype(str).value_counts(normalize=True)
+            top = vc.iloc[:10]
+            probs = [{"label": str(idx), "p": float(p)} for idx, p in top.items()]
+            other = float(vc.iloc[10:].sum()) if len(vc) > 10 else 0.0
+            if other > 0:
+                probs.append({"label": "<other>", "p": other})
+            params["Categorical"] = {"probs": probs}
+            return params
+        # Numeric
+        mv = moments_numeric(s)
+        if mv is None:
+            return params
+        m, v, mn = mv
+        # Count candidates (Poisson, NegBin)
+        if is_count_series(s):
+            params["Poisson"] = {"lambda": m}
+            if v > m + 1e-12:
+                k = (m * m) / (v - m)
+                pnb = k / (k + m)
+                if np.isfinite(k) and k > 0 and 0 < pnb < 1:
+                    params["Negative Binomial"] = {"k": k, "p": pnb}
+        # Continuous candidates require positivity for some families
+        # Gaussian (no support restriction)
+        params["Gaussian"] = {"mu": m, "sigma": float(np.sqrt(max(0.0, v)))}
+        if mn > 0:
+            # Exponential
+            if m > 0:
+                params["Exponential"] = {"lambda": 1.0 / m}
+            # Gamma
+            if v > 0:
+                k = (m * m) / v
+                theta = v / m
+                if np.isfinite(k) and np.isfinite(theta) and k > 0 and theta > 0:
+                    params["Gamma"] = {"k": k, "theta": theta}
+            # Lognormal (use log-moments)
+            arr = s.to_numpy(dtype=float)
+            if np.all(arr > 0):
+                y = np.log(arr)
+                params["Lognormal"] = {"mu_log": float(np.mean(y)), "sigma_log": float(np.std(y))}
+            # Pareto II (Lomax) via moments when defined
+            if v > (m * m) + 1e-12:
+                alpha = 2.0 * v / (v - m * m)
+                lam = m * (alpha - 1.0)
+                if np.isfinite(alpha) and np.isfinite(lam) and alpha > 2.0 and lam > 0:
+                    params["Pareto II (Lomax)"] = {"alpha": alpha, "lambda": lam}
+        return params
+
+    dist_params = {col: dist_params_for(col, df[col]) for col in overview_cols}
+
     return {
         "target": target,
         "total_mi": total_mi,
@@ -247,6 +322,7 @@ async def shapley_mi(
         "top_features": top_features,
         "five_num": summaries,
         "spearman": spearman,
+        "dist_params": dist_params,
     }
 
 

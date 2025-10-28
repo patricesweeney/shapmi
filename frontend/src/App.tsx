@@ -478,6 +478,15 @@ function DistributionsTable({ result }: { result: any }) {
       : (active ? 'bg-emerald-200 text-emerald-900' : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200')
     return base + ' ' + palette
   }
+  const formatParams = (variable: string, selected: string | undefined) => {
+    const all = (result?.dist_params?.[variable] as Record<string, any>) || {}
+    if (!selected || !all[selected]) return '—'
+    const obj = all[selected]
+    const entries = Object.entries(obj)
+      .map(([k, v]) => `${k}=${typeof v === 'number' ? Number(v).toFixed(3) : Array.isArray(v) ? JSON.stringify(v) : String(v)}`)
+      .join(', ')
+    return entries || '—'
+  }
   return (
     <div className="w-full overflow-x-auto">
       <table className="w-full text-sm">
@@ -510,7 +519,7 @@ function DistributionsTable({ result }: { result: any }) {
                     ))}
                   </div>
                 </td>
-                <td className="py-2 px-2">{r.params}</td>
+                <td className="py-2 px-2">{formatParams(r.variable, selected)}</td>
               </tr>
             )
           })}
