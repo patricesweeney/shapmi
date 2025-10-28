@@ -1,14 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { BrowserRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { Button } from './components/ui/button'
-import { Input } from './components/ui/input'
 import { Label } from './components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './components/ui/table'
-import { Header } from './components/layout/Header'
-import { Footer } from './components/layout/Footer'
-import { motion } from 'framer-motion'
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell } from 'recharts'
 
 type Contribution = { feature: string; value: number }
 
@@ -23,10 +20,47 @@ function Onboarding() {
     contributions: Contribution[]
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [pageDragging, setPageDragging] = useState(false)
 
   const canAnalyze = useMemo(() => !!file && !!target, [file, target])
 
   const navigate = useNavigate()
+
+  useEffect(() => {
+    function hasFiles(e: DragEvent) {
+      return Array.from(e.dataTransfer?.types || []).includes('Files')
+    }
+    function onDragEnter(e: DragEvent) {
+      if (!hasFiles(e)) return
+      setPageDragging(true)
+    }
+    function onDragOver(e: DragEvent) {
+      if (!hasFiles(e)) return
+      e.preventDefault()
+      setPageDragging(true)
+    }
+    function onDragLeave(e: DragEvent) {
+      if (!hasFiles(e)) return
+      setPageDragging(false)
+    }
+    function onDrop(e: DragEvent) {
+      if (!hasFiles(e)) return
+      e.preventDefault()
+      setPageDragging(false)
+      const f = e.dataTransfer?.files?.[0]
+      if (f) void handleFileChange(f)
+    }
+    window.addEventListener('dragenter', onDragEnter)
+    window.addEventListener('dragover', onDragOver)
+    window.addEventListener('dragleave', onDragLeave)
+    window.addEventListener('drop', onDrop)
+    return () => {
+      window.removeEventListener('dragenter', onDragEnter)
+      window.removeEventListener('dragover', onDragOver)
+      window.removeEventListener('dragleave', onDragLeave)
+      window.removeEventListener('drop', onDrop)
+    }
+  }, [])
 
   async function handleFileChange(f: File) {
     setFile(f)
@@ -66,67 +100,143 @@ function Onboarding() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground transition-colors duration-normal ease-standard">
+    <div className={"min-h-screen bg-background text-foreground transition-colors duration-normal ease-standard " + (pageDragging ? 'cursor-copy' : '')}>
+      <AnimatePresence>
+        {pageDragging && (
+          <motion.div
+            className="fixed inset-0 z-10 pointer-events-none bg-green-100/40"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+          />
+        )}
+      </AnimatePresence>
       <div className="h-14 border-b flex items-center px-6">
-        <div className="flex items-center gap-3">
-          <div className="h-6 w-6 rounded bg-black" />
-          <span className="font-semibold tracking-tight">Shapmi</span>
+        <div className="flex items-center gap-2">
+          <div className="h-5 w-5 rounded bg-black" />
         </div>
       </div>
-      <main className="px-6 py-10">
-        <div className="mx-auto max-w-4xl space-y-6">
-          <div className="text-center space-y-1">
-            <div className="flex items-center justify-center gap-2">
-              <div className="h-8 w-8 rounded bg-black" />
-              <h1 className="text-3xl font-semibold tracking-tight">Upload a dataset to begin analysis</h1>
-            </div>
-            <p className="text-muted-foreground">CSV or Excel formats supported</p>
-          </div>
+      <main className={result ? 'px-6 py-8' : 'px-6 py-0'}>
+        <div className={result ? 'mx-auto max-w-5xl' : 'mx-auto max-w-2xl min-h-[calc(100vh-56px)] flex flex-col items-center'}>
+          <motion.div className={result ? 'mb-6 w-full' : 'w-full text-center mt-[15vh]'} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
+            <h1 className="mx-auto text-[1.8rem] font-medium tracking-tight leading-snug">
+              Import dataset
+            </h1>
+            <p className="mt-2 text-[1rem] leading-[1.4] font-light text-muted-foreground">Upload → Select target → Decompose</p>
+          </motion.div>
 
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: 'easeOut' }}>
-            <Card>
-              <CardHeader>
-                <CardTitle>Step 1 – Upload Data</CardTitle>
-                <CardDescription>1. Upload dataset → 2. Select target → 3. View decomposition.</CardDescription>
-              </CardHeader>
-              <CardContent>
-              <div
-                className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors duration-normal ease-standard hover:bg-muted"
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  const f = e.dataTransfer.files?.[0]
+          <motion.div className="mt-4 flex justify-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
+            <Button
+              disabled={loading || (!file ? false : !canAnalyze)}
+              onClick={() => {
+                if (!file) {
+                  document.getElementById('file')?.click()
+                  return
+                }
+                if (canAnalyze) void analyze()
+              }}
+            >
+              <AnimatePresence mode="wait" initial={false}>
+                {loading ? (
+                  <motion.span
+                    key="loading"
+                    initial={{ opacity: 0, y: 2 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -2 }}
+                    transition={{ duration: 0.15 }}
+                    className="inline-flex items-center gap-2 text-sm font-normal"
+                  >
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                    Analyzing…
+                  </motion.span>
+                ) : file ? (
+                  <motion.span
+                    key={canAnalyze ? 'decompose' : 'select-target'}
+                    initial={{ opacity: 0, y: 2 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -2 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    {canAnalyze ? 'decompose' : 'select target'}
+                  </motion.span>
+                ) : (
+                  <motion.span
+                    key="select-file"
+                    initial={{ opacity: 0, y: 2 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -2 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    select file
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </Button>
+          </motion.div>
+
+          <motion.div className="mt-10" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
+            <div
+              className={
+                'relative text-center cursor-copy transition-all duration-150 ease-in-out ' +
+                'rounded-[12px] p-10 border border-dashed border-black/10 hover:border-black/20 hover:bg-black/5 hover:scale-[1.02] active:bg-black/10 '
+              }
+              onDragOver={(e) => {
+                e.preventDefault()
+                e.currentTarget.classList.add('bg-black/5', 'border-black/20')
+              }}
+              onDragLeave={(e) => {
+                e.currentTarget.classList.remove('bg-black/5', 'border-black/20')
+              }}
+              onDrop={(e) => {
+                e.preventDefault()
+                e.currentTarget.classList.remove('bg-black/5', 'border-black/20')
+                const f = e.dataTransfer.files?.[0]
+                if (f) void handleFileChange(f)
+              }}
+              onClick={() => document.getElementById('file')?.click()}
+            >
+              <input
+                id="file"
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
                   if (f) void handleFileChange(f)
                 }}
-              >
-                <input
-                  id="file"
-                  type="file"
-                  accept=".csv,.xlsx,.xls"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0]
-                    if (f) void handleFileChange(f)
-                  }}
-                />
-                <label htmlFor="file">
-                  <Button className="transition-colors duration-normal ease-standard" disabled={loading}>
-                    {loading ? 'Loading…' : 'Select File'}
-                  </Button>
-                </label>
-                <div className="mt-2 text-xs text-muted-foreground">Example: data.csv (≤ 5 MB)</div>
-                {file && (
-                  <div className="mt-2 inline-flex items-center gap-2 rounded border px-2 py-1 text-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 text-green-600"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.9a.75.75 0 1 0-1.22-.9l-3.236 4.384-1.56-1.56a.75.75 0 1 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.746-5.14Z" clipRule="evenodd" /></svg>
-                    <span>{file.name}</span>
-                    <span className="text-muted-foreground">({(file.size / 1024).toFixed(1)} KB)</span>
-                  </div>
-                )}
+              />
+              <div className="inline-flex items-center gap-2 text-[0.95rem] leading-[1.4] font-light text-muted-foreground">
+                <span>Drop or select CSV/Excel file</span>
               </div>
 
+              <AnimatePresence initial={false}>
+                {file && (
+                  <motion.div
+                    key="selected-file"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="mt-3 text-xs text-muted-foreground"
+                  >
+                    Selected: <span className="text-foreground/80">{file.name}</span> <span className="text-muted-foreground">({(file.size / 1024).toFixed(1)} KB)</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            <AnimatePresence>
               {columns.length > 0 && (
-                <div className="mt-6 grid gap-2">
-                  <Label htmlFor="target">Target variable</Label>
+                <motion.div
+                  key="target-select"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.2 }}
+                  className="mt-6 grid gap-2 max-w-sm"
+                >
+                  <Label htmlFor="target" className="font-light">Target</Label>
                   <Select value={target} onValueChange={setTarget}>
                     <SelectTrigger id="target">
                       <SelectValue placeholder="Select target" />
@@ -139,25 +249,9 @@ function Onboarding() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </motion.div>
               )}
-
-              <div className="mt-8">
-                <Button disabled={!canAnalyze || loading} onClick={() => void analyze()}>
-                  {loading ? (
-                    <span className="inline-flex items-center gap-2">
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-                      Analyzing…
-                    </span>
-                  ) : (
-                    'Analyze'
-                  )}
-                </Button>
-              </div>
-
-              {error && <div className="mt-4 text-sm text-red-600">{error}</div>}
-              </CardContent>
-            </Card>
+            </AnimatePresence>
           </motion.div>
         </div>
       </main>
@@ -175,52 +269,44 @@ function Analyze() {
   } | null
 
   return (
-    <div className="min-h-screen grid grid-cols-[240px_1fr]">
-      <aside className="border-r bg-white">
-        <div className="h-14 border-b flex items-center px-6">
-          <div className="flex items-center gap-3">
-            <div className="h-6 w-6 rounded bg-black" />
-            <span className="font-semibold tracking-tight">Shapmi</span>
-          </div>
+    <div className="min-h-screen grid grid-cols-[240px_1fr] mx-16">
+      <aside className="bg-white">
+        <div className="h-14 border-b border-neutral-200 flex items-center px-16">
+          <div className="flex items-center gap-2"><div className="h-5 w-5 rounded bg-neutral-900" /></div>
         </div>
-        <nav className="p-4 text-sm text-muted-foreground space-y-2">
-          <div className="font-medium text-foreground">Project</div>
-          <div>Overview</div>
-          <div>Data</div>
-          <div>Results</div>
-          <div>Settings</div>
+        <nav className="px-16 py-4 text-sm font-light text-neutral-700 space-y-2">
+          <div className="text-neutral-900 font-medium">Project</div>
+          <div className="pl-3">Overview</div>
+          <div className="pl-3">Data</div>
+          <div className="pl-3 border-l-2 border-neutral-900 text-neutral-900 font-medium">Results</div>
+          <div className="pl-3">Settings</div>
         </nav>
       </aside>
-      <div className="min-h-screen bg-background">
-        <div className="h-14 border-b" />
-        <main className="px-6 py-8 transition-[padding,background-color,color] duration-normal ease-standard">
-          <div className="flex items-center justify-between">
+      <div className="min-h-screen bg-white">
+        <div className="h-14 border-b border-neutral-200 px-16" />
+        <main className="px-16 py-12 transition-[padding,background-color,color] duration-150 ease-in-out">
+          <div className="space-y-3">
             <div>
-              <h2 className="text-2xl font-semibold tracking-tight">Analysis</h2>
+              <h2 className="text-[1.4rem] font-medium text-neutral-900 tracking-tight">Analysis</h2>
               {result && (
-                <p className="text-sm text-muted-foreground">Target: {result.target} • Total MI: {result.total_mi}</p>
+                <p className="text-sm font-light text-neutral-600">Target: {result.target} · Total MI: {result.total_mi?.toFixed?.(3) ?? result.total_mi}</p>
               )}
             </div>
-          </div>
-
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>MI Breakdown</CardTitle>
-              <CardDescription>Shapley-style feature contributions (placeholder)</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="w-full overflow-x-auto">
+            <section className="space-y-6">
+              <div>
+                <h3 className="text-[1.1rem] font-medium text-neutral-900">MI Breakdown</h3>
+                <p className="text-sm font-light text-neutral-500">Shapley-style feature contributions</p>
+              </div>
+              <div className="w-full overflow-x-auto opacity-0 animate-[fadeIn_200ms_ease-out_forwards]">
                 <MIBarChart data={result?.contributions || []} />
               </div>
-            </CardContent>
-          </Card>
+            </section>
+          </div>
         </main>
       </div>
     </div>
   )
 }
-
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell } from 'recharts'
 
 function MIBarChart({ data }: { data: { feature: string; value: number }[] }) {
   const sorted = [...data].sort((a, b) => b.value - a.value)
@@ -229,16 +315,16 @@ function MIBarChart({ data }: { data: { feature: string; value: number }[] }) {
     <div className="h-80">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={sorted} margin={{ left: 20, right: 20 }}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-          <XAxis dataKey="feature" tick={{ fontSize: 12 }} interval={0} angle={-30} dy={10} height={60} />
-          <YAxis tick={{ fontSize: 12 }} />
-          <Tooltip />
-          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+          <CartesianGrid vertical={false} strokeDasharray="0" stroke="#e5e7eb" />
+          <XAxis dataKey="feature" tick={{ fontSize: 10, fill: '#9CA3AF', fontWeight: 200 }} interval={0} angle={-30} dy={10} height={60} />
+          <YAxis tick={{ fontSize: 10, fill: '#9CA3AF', fontWeight: 200 }} />
+          <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ boxShadow: 'none', border: '1px solid #e5e7eb' }} />
+          <Bar dataKey="value" radius={[4, 4, 0, 0]} fill="#5C6670" opacity={0.8} className="transition-all duration-150 ease-in-out">
             {sorted.map((entry) => (
               <Cell
                 key={entry.feature}
-                fill={active === entry.feature ? 'hsl(222.2 47.4% 11.2%)' : 'hsl(215.4 16.3% 46.9%)'}
-                className="transition-all duration-normal ease-standard"
+                fill="#5C6670"
+                fillOpacity={active === entry.feature ? 0.9 : 0.8}
                 onMouseEnter={() => setActive(entry.feature)}
                 onMouseLeave={() => setActive(null)}
               />)

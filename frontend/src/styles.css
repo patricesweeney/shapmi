@@ -27,7 +27,7 @@
   }
 
   html, body, #root { height: 100%; }
-  body { font-feature-settings: "rlig" 1, "calt" 1; }
+  body { font-feature-settings: "rlig" 1, "calt" 1; line-height: 1.4; }
 
   @media (prefers-reduced-motion: reduce) {
     * {
@@ -37,6 +37,11 @@
       scroll-behavior: auto !important;
     }
   }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 

@@ -7,11 +7,11 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'default', ...props }, ref) => {
-    const base = 'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors duration-normal ease-standard focus:outline-none disabled:opacity-50 disabled:pointer-events-none h-9 px-4 py-2'
+    const base = 'inline-flex items-center justify-center rounded-[8px] text-sm font-medium transition-colors duration-150 ease-in-out focus:outline-none disabled:opacity-50 disabled:pointer-events-none px-6 py-3'
     const variants: Record<NonNullable<ButtonProps['variant']>, string> = {
-      default: 'bg-black text-white hover:bg-black/90',
-      secondary: 'bg-gray-100 hover:bg-gray-200 text-gray-900',
-      ghost: 'hover:bg-gray-100',
+      default: 'bg-neutral-900 text-white hover:bg-neutral-800',
+      secondary: 'bg-neutral-100 hover:bg-neutral-200 text-neutral-900',
+      ghost: 'hover:bg-neutral-100',
     }
     return (
       <button ref={ref} className={cn(base, variants[variant], className)} {...props} />
