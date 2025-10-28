@@ -66,8 +66,13 @@ function Onboarding() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <Header />
-      <main className="container py-10">
+      <div className="h-14 border-b flex items-center px-6">
+        <div className="flex items-center gap-3">
+          <div className="h-6 w-6 rounded bg-black" />
+          <span className="font-semibold tracking-tight">Shapmi</span>
+        </div>
+      </div>
+      <main className="px-6 py-10">
         <div className="mx-auto max-w-4xl space-y-6">
           <div className="text-center space-y-2">
             <h1 className="text-3xl font-semibold tracking-tight">Shapley Decomposition of Mutual Information</h1>
@@ -134,7 +139,6 @@ function Onboarding() {
           </Card>
         </div>
       </main>
-      <Footer />
     </div>
   )
 }
@@ -151,7 +155,12 @@ function Analyze() {
   return (
     <div className="min-h-screen grid grid-cols-[240px_1fr]">
       <aside className="border-r bg-white">
-        <div className="h-14 border-b flex items-center px-4 font-semibold">ShapMI</div>
+        <div className="h-14 border-b flex items-center px-6">
+          <div className="flex items-center gap-3">
+            <div className="h-6 w-6 rounded bg-black" />
+            <span className="font-semibold tracking-tight">Shapmi</span>
+          </div>
+        </div>
         <nav className="p-4 text-sm text-muted-foreground space-y-2">
           <div className="font-medium text-foreground">Project</div>
           <div>Overview</div>
@@ -161,8 +170,13 @@ function Analyze() {
         </nav>
       </aside>
       <div className="min-h-screen bg-background">
-        <Header />
-        <main className="container py-8">
+        <div className="h-14 border-b flex items-center px-6">
+          <div className="flex items-center gap-3">
+            <div className="h-6 w-6 rounded bg-black" />
+            <span className="font-semibold tracking-tight">Shapmi</span>
+          </div>
+        </div>
+        <main className="px-6 py-8">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-semibold tracking-tight">Analysis</h2>
