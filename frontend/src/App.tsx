@@ -297,15 +297,13 @@ function Analyze() {
           >
             Info Decomp
           </button>
-        </nav>
-        <div className="mt-auto px-16 py-4">
           <button
-            className={(activeNav === 'dists' ? 'border-neutral-900 text-neutral-900 font-medium ' : 'text-neutral-700 hover:text-neutral-900 ') + 'pl-3 border-l-2 border-transparent w-full text-left text-sm font-light'}
+            className={(activeNav === 'dists' ? 'border-neutral-900 text-neutral-900 font-medium ' : 'text-neutral-700 hover:text-neutral-900 ') + 'pl-3 border-l-2 border-transparent w-full text-left'}
             onClick={() => setActiveNav('dists')}
           >
             Distributions
           </button>
-        </div>
+        </nav>
       </aside>
       <div className="min-h-screen bg-white">
         <div className="h-14 border-b border-neutral-200 px-16" />
