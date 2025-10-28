@@ -266,7 +266,9 @@ function Analyze() {
     target: string
     total_mi: number
     contributions: { feature: string; value: number }[]
+    entropy?: number
   } | null
+  const [mode, setMode] = useState<'absolute' | 'percent'>('percent')
 
   return (
     <div className="min-h-screen grid grid-cols-[240px_1fr] mx-16">
@@ -286,11 +288,29 @@ function Analyze() {
         <div className="h-14 border-b border-neutral-200 px-16" />
         <main className="px-16 py-12 transition-[padding,background-color,color] duration-150 ease-in-out">
           <div className="space-y-3">
-            <div>
-              <h2 className="text-[1.4rem] font-medium text-neutral-900 tracking-tight">Analysis</h2>
-              {result && (
-                <p className="text-sm font-light text-neutral-600">Target: {result.target} · Total MI: {result.total_mi?.toFixed?.(3) ?? result.total_mi}</p>
-              )}
+            <div className="flex items-end justify-between">
+              <div>
+                <h2 className="text-[1.4rem] font-medium text-neutral-900 tracking-tight">Analysis</h2>
+                {result && (
+                  <p className="text-sm font-light text-neutral-600">Target: {result.target} · Total MI: {(result.total_mi ?? 0).toFixed(3)} · Entropy: {(result.entropy ?? 0).toFixed(3)} bits</p>
+                )}
+              </div>
+              <div className="text-sm font-light text-neutral-600">
+                <div className="inline-flex items-center rounded-[8px] border border-neutral-200 overflow-hidden">
+                  <button
+                    className={"px-3 py-1 transition-colors duration-150 " + (mode === 'absolute' ? 'bg-neutral-900 text-white' : 'text-neutral-700 hover:bg-neutral-100')}
+                    onClick={() => setMode('absolute')}
+                  >
+                    abs
+                  </button>
+                  <button
+                    className={"px-3 py-1 transition-colors duration-150 " + (mode === 'percent' ? 'bg-neutral-900 text-white' : 'text-neutral-700 hover:bg-neutral-100')}
+                    onClick={() => setMode('percent')}
+                  >
+                    % of entropy
+                  </button>
+                </div>
+              </div>
             </div>
             <section className="space-y-6">
               <div>
@@ -298,7 +318,7 @@ function Analyze() {
                 <p className="text-sm font-light text-neutral-500">Shapley-style feature contributions</p>
               </div>
               <div className="w-full overflow-x-auto opacity-0 animate-[fadeIn_200ms_ease-out_forwards]">
-                <MIBarChart data={result?.contributions || []} />
+                <MIBarChart data={result?.contributions || []} mode={mode} entropy={result?.entropy} />
               </div>
             </section>
           </div>
@@ -308,23 +328,32 @@ function Analyze() {
   )
 }
 
-function MIBarChart({ data }: { data: { feature: string; value: number }[] }) {
+function MIBarChart({ data, mode, entropy }: { data: { feature: string; value: number }[]; mode: 'absolute' | 'percent'; entropy?: number }) {
   const sorted = [...data].sort((a, b) => b.value - a.value)
   const [active, setActive] = useState<string | null>(null)
+  const values = sorted.map(d => ({
+    feature: d.feature,
+    value: mode === 'percent' && (entropy ?? 0) > 0 ? (d.value / (entropy as number)) * 100 : d.value,
+  }))
   return (
     <div className="h-80">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={sorted} margin={{ left: 20, right: 20 }}>
+        <BarChart data={values} layout="vertical" margin={{ left: 20, right: 20 }}>
           <CartesianGrid vertical={false} strokeDasharray="0" stroke="#e5e7eb" />
-          <XAxis dataKey="feature" tick={{ fontSize: 10, fill: '#9CA3AF', fontWeight: 200 }} interval={0} angle={-30} dy={10} height={60} />
-          <YAxis tick={{ fontSize: 10, fill: '#9CA3AF', fontWeight: 200 }} />
-          <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ boxShadow: 'none', border: '1px solid #e5e7eb' }} />
-          <Bar dataKey="value" radius={[4, 4, 0, 0]} fill="#5C6670" opacity={0.8} className="transition-all duration-150 ease-in-out">
-            {sorted.map((entry) => (
+          <XAxis type="number" tick={{ fontSize: 10, fill: '#9CA3AF', fontWeight: 200 }} tickFormatter={(v) => mode === 'percent' ? `${Math.round(Number(v))}` : Number(v).toFixed(2)} />
+          <YAxis type="category" dataKey="feature" tick={{ fontSize: 10, fill: '#9CA3AF', fontWeight: 200 }} width={100} />
+          <Tooltip
+            cursor={{ fill: 'rgba(0,0,0,0.03)' }}
+            contentStyle={{ boxShadow: 'none', border: '1px solid #e5e7eb' }}
+            formatter={(val) => mode === 'percent' ? `${Math.round(Number(val))}%` : Number(val as number).toFixed(2)}
+          />
+          <Bar dataKey="value" radius={[0, 4, 4, 0]} fill="#5C6670" opacity={0.8} isAnimationActive={false} className="transition-all duration-150 ease-in-out">
+            {values.map((entry) => (
               <Cell
                 key={entry.feature}
                 fill="#5C6670"
-                fillOpacity={active === entry.feature ? 0.9 : 0.8}
+                fillOpacity={active === entry.feature ? 1.0 : 0.8}
+                style={{ transition: 'opacity 150ms ease-in-out, filter 150ms ease-in-out', filter: active === entry.feature ? 'brightness(1.06)' : 'none' }}
                 onMouseEnter={() => setActive(entry.feature)}
                 onMouseLeave={() => setActive(null)}
               />)
