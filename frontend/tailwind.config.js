@@ -13,6 +13,17 @@ export default {
       },
     },
     extend: {
+      transitionTimingFunction: {
+        standard: 'cubic-bezier(0.2, 0, 0, 1)',
+        emphasized: 'cubic-bezier(0.2, 0, 0, 1)',
+        decelerate: 'cubic-bezier(0.05, 0.7, 0.1, 1)',
+        accelerate: 'cubic-bezier(0.3, 0, 0.8, 0.15)',
+      },
+      transitionDuration: {
+        fast: '150ms',
+        normal: '200ms',
+        slow: '300ms',
+      },
       colors: {
         border: 'hsl(214.3 31.8% 91.4%)',
         input: 'hsl(214.3 31.8% 91.4%)',

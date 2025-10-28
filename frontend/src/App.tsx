@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './components/ui/table'
 import { Header } from './components/layout/Header'
 import { Footer } from './components/layout/Footer'
+import { motion } from 'framer-motion'
 
 type Contribution = { feature: string; value: number }
 
@@ -65,7 +66,7 @@ function Onboarding() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-normal ease-standard">
       <div className="h-14 border-b flex items-center px-6">
         <div className="flex items-center gap-3">
           <div className="h-6 w-6 rounded bg-black" />
@@ -74,19 +75,23 @@ function Onboarding() {
       </div>
       <main className="px-6 py-10">
         <div className="mx-auto max-w-4xl space-y-6">
-          <div className="text-center space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight">Shapley Decomposition of Mutual Information</h1>
-            <p className="text-muted-foreground">Upload a dataset, select your target, and get a placeholder decomposition.</p>
+          <div className="text-center space-y-1">
+            <div className="flex items-center justify-center gap-2">
+              <div className="h-8 w-8 rounded bg-black" />
+              <h1 className="text-3xl font-semibold tracking-tight">Upload a dataset to begin analysis</h1>
+            </div>
+            <p className="text-muted-foreground">CSV or Excel formats supported</p>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Upload</CardTitle>
-              <CardDescription>CSV or Excel files are supported.</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: 'easeOut' }}>
+            <Card>
+              <CardHeader>
+                <CardTitle>Step 1 – Upload Data</CardTitle>
+                <CardDescription>1. Upload dataset → 2. Select target → 3. View decomposition.</CardDescription>
+              </CardHeader>
+              <CardContent>
               <div
-                className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer"
+                className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors duration-normal ease-standard hover:bg-muted"
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => {
                   e.preventDefault()
@@ -105,9 +110,18 @@ function Onboarding() {
                   }}
                 />
                 <label htmlFor="file">
-                  <Button>Select File</Button>
+                  <Button className="transition-colors duration-normal ease-standard" disabled={loading}>
+                    {loading ? 'Loading…' : 'Select File'}
+                  </Button>
                 </label>
-                {file && <div className="mt-2 text-sm text-muted-foreground">{file.name}</div>}
+                <div className="mt-2 text-xs text-muted-foreground">Example: data.csv (≤ 5 MB)</div>
+                {file && (
+                  <div className="mt-2 inline-flex items-center gap-2 rounded border px-2 py-1 text-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 text-green-600"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.9a.75.75 0 1 0-1.22-.9l-3.236 4.384-1.56-1.56a.75.75 0 1 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.746-5.14Z" clipRule="evenodd" /></svg>
+                    <span>{file.name}</span>
+                    <span className="text-muted-foreground">({(file.size / 1024).toFixed(1)} KB)</span>
+                  </div>
+                )}
               </div>
 
               {columns.length > 0 && (
@@ -128,15 +142,23 @@ function Onboarding() {
                 </div>
               )}
 
-              <div className="mt-6">
+              <div className="mt-8">
                 <Button disabled={!canAnalyze || loading} onClick={() => void analyze()}>
-                  {loading ? 'Analyzing…' : 'Analyze'}
+                  {loading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                      Analyzing…
+                    </span>
+                  ) : (
+                    'Analyze'
+                  )}
                 </Button>
               </div>
 
               {error && <div className="mt-4 text-sm text-red-600">{error}</div>}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </motion.div>
         </div>
       </main>
     </div>
@@ -170,13 +192,8 @@ function Analyze() {
         </nav>
       </aside>
       <div className="min-h-screen bg-background">
-        <div className="h-14 border-b flex items-center px-6">
-          <div className="flex items-center gap-3">
-            <div className="h-6 w-6 rounded bg-black" />
-            <span className="font-semibold tracking-tight">Shapmi</span>
-          </div>
-        </div>
-        <main className="px-6 py-8">
+        <div className="h-14 border-b" />
+        <main className="px-6 py-8 transition-[padding,background-color,color] duration-normal ease-standard">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-semibold tracking-tight">Analysis</h2>
@@ -203,10 +220,11 @@ function Analyze() {
   )
 }
 
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts'
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell } from 'recharts'
 
 function MIBarChart({ data }: { data: { feature: string; value: number }[] }) {
   const sorted = [...data].sort((a, b) => b.value - a.value)
+  const [active, setActive] = useState<string | null>(null)
   return (
     <div className="h-80">
       <ResponsiveContainer width="100%" height="100%">
@@ -215,7 +233,17 @@ function MIBarChart({ data }: { data: { feature: string; value: number }[] }) {
           <XAxis dataKey="feature" tick={{ fontSize: 12 }} interval={0} angle={-30} dy={10} height={60} />
           <YAxis tick={{ fontSize: 12 }} />
           <Tooltip />
-          <Bar dataKey="value" fill="hsl(222.2 47.4% 11.2%)" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+            {sorted.map((entry) => (
+              <Cell
+                key={entry.feature}
+                fill={active === entry.feature ? 'hsl(222.2 47.4% 11.2%)' : 'hsl(215.4 16.3% 46.9%)'}
+                className="transition-all duration-normal ease-standard"
+                onMouseEnter={() => setActive(entry.feature)}
+                onMouseLeave={() => setActive(null)}
+              />)
+            )}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>
