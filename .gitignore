@@ -1,0 +1,12 @@
+node_modules/
+.vercel/
+.env*
+frontend/dist/
+__pycache__/
+.pytest_cache/
+.vscode/
+.DS_Store
+*.ipynb_checkpoints
+venv/
+env/
+
