@@ -267,8 +267,11 @@ function Analyze() {
     total_mi: number
     contributions: { feature: string; value: number }[]
     entropy?: number
+    entropy_pct?: number
+    entropy_max?: number
   } | null
   const [mode, setMode] = useState<'absolute' | 'percent'>('percent')
+  const [activeNav, setActiveNav] = useState<'overview' | 'info'>('info')
 
   return (
     <div className="min-h-screen grid grid-cols-[240px_1fr] mx-16">
@@ -277,11 +280,18 @@ function Analyze() {
           <div className="flex items-center gap-2"><div className="h-5 w-5 rounded bg-neutral-900" /></div>
         </div>
         <nav className="px-16 py-4 text-sm font-light text-neutral-700 space-y-2">
-          <div className="text-neutral-900 font-medium">Project</div>
-          <div className="pl-3">Overview</div>
-          <div className="pl-3">Data</div>
-          <div className="pl-3 border-l-2 border-neutral-900 text-neutral-900 font-medium">Results</div>
-          <div className="pl-3">Settings</div>
+          <button
+            className={(activeNav === 'overview' ? 'border-neutral-900 text-neutral-900 font-medium ' : 'text-neutral-700 hover:text-neutral-900 ') + 'pl-3 border-l-2 border-transparent w-full text-left'}
+            onClick={() => setActiveNav('overview')}
+          >
+            Overview
+          </button>
+          <button
+            className={(activeNav === 'info' ? 'border-neutral-900 text-neutral-900 font-medium ' : 'text-neutral-700 hover:text-neutral-900 ') + 'pl-3 border-l-2 border-transparent w-full text-left'}
+            onClick={() => setActiveNav('info')}
+          >
+            Info Decomp
+          </button>
         </nav>
       </aside>
       <div className="min-h-screen bg-white">
@@ -312,15 +322,57 @@ function Analyze() {
                 </div>
               </div>
             </div>
-            <section className="space-y-6">
-              <div>
-                <h3 className="text-[1.1rem] font-medium text-neutral-900">MI Breakdown</h3>
-                <p className="text-sm font-light text-neutral-500">Shapley-style feature contributions</p>
-              </div>
-              <div className="w-full overflow-x-auto opacity-0 animate-[fadeIn_200ms_ease-out_forwards]">
-                <MIBarChart data={result?.contributions || []} mode={mode} entropy={result?.entropy} />
-              </div>
-            </section>
+            {activeNav === 'overview' ? (
+              <>
+                <section className="space-y-6">
+                  <div>
+                    <h3 className="text-[1.1rem] font-medium text-neutral-900">Five-number summaries</h3>
+                    <p className="text-sm font-light text-neutral-500">Target highlighted; top 4 MI features</p>
+                  </div>
+                  <FiveNum summaries={result?.five_num} target={result?.target} />
+                </section>
+                <section className="space-y-6 mt-6">
+                  <div>
+                    <h3 className="text-[1.1rem] font-medium text-neutral-900">Spearman rank correlation</h3>
+                    <p className="text-sm font-light text-neutral-500">Target and top features</p>
+                  </div>
+                  <SpearmanHeatmap data={result?.spearman} />
+                </section>
+              </>
+            ) : (
+              <>
+                <section className="space-y-6">
+                  <div>
+                    <h3 className="text-[1.1rem] font-medium text-neutral-900">Target entropy</h3>
+                    <p className="text-sm font-light text-neutral-500">How informative the target is</p>
+                  </div>
+                  <div className="w-full opacity-0 animate-[fadeIn_200ms_ease-out_forwards]">
+                    {result ? (
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1 h-3 rounded-full bg-neutral-100 overflow-hidden">
+                          <div className="h-full bg-neutral-400/70 transition-all duration-150 ease-in-out" style={{ width: `${Math.max(0, Math.min(100, result.entropy_pct ?? 0))}%` }} />
+                        </div>
+                        <div className="text-sm font-light text-neutral-600 min-w-[88px] text-right">
+                          {(result.entropy_pct ?? 0).toFixed(0)}%
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="h-3 rounded-full bg-neutral-100" />
+                    )}
+                  </div>
+                </section>
+
+                <section className="space-y-6 mt-6">
+                  <div>
+                    <h3 className="text-[1.1rem] font-medium text-neutral-900">Info Decomp</h3>
+                    <p className="text-sm font-light text-neutral-500">Shapley-style feature contributions</p>
+                  </div>
+                  <div className="w-full overflow-x-auto opacity-0 animate-[fadeIn_200ms_ease-out_forwards]">
+                    <MIBarChart data={result?.contributions || []} mode={mode} entropy={result?.entropy} />
+                  </div>
+                </section>
+              </>
+            )}
           </div>
         </main>
       </div>
@@ -376,4 +428,87 @@ export function App() {
   )
 }
 
+
+function FiveNum({ summaries, target }: { summaries?: Record<string, any> | null; target?: string }) {
+  if (!summaries) return null
+  const entries = Object.entries(summaries)
+  return (
+    <div className="w-full overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-neutral-500 font-light">
+            <th className="text-left py-2 pr-4 font-light">Variable</th>
+            <th className="text-right py-2 px-2 font-light">Min</th>
+            <th className="text-right py-2 px-2 font-light">Q1</th>
+            <th className="text-right py-2 px-2 font-light">Median</th>
+            <th className="text-right py-2 px-2 font-light">Q3</th>
+            <th className="text-right py-2 px-2 font-light">Max</th>
+            <th className="text-right py-2 pl-2 font-light">Missing</th>
+          </tr>
+        </thead>
+        <tbody className="align-top">
+          {entries.map(([key, summary]) => (
+            <tr key={key} className={key === target ? 'text-neutral-900 font-medium' : 'text-neutral-700 font-light'}>
+              <td className={(key === target ? 'border-l-2 border-neutral-900 pl-2 ' : '') + 'py-2 pr-4'}>{key}</td>
+              {summary.numeric ? (
+                <>
+                  <td className="text-right py-2 px-2">{Number(summary.min).toFixed(2)}</td>
+                  <td className="text-right py-2 px-2">{Number(summary.q1).toFixed(2)}</td>
+                  <td className="text-right py-2 px-2">{Number(summary.median).toFixed(2)}</td>
+                  <td className="text-right py-2 px-2">{Number(summary.q3).toFixed(2)}</td>
+                  <td className="text-right py-2 px-2">{Number(summary.max).toFixed(2)}</td>
+                </>
+              ) : (
+                <>
+                  <td className="text-right py-2 px-2" colSpan={5}>—</td>
+                </>
+              )}
+              <td className="text-right py-2 pl-2">{Number(summary.missing || 0)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function SpearmanHeatmap({ data }: { data?: { order: string[]; matrix: number[][] } | null }) {
+  if (!data || !data.order?.length || !data.matrix?.length) return null
+  const labels = data.order
+  const matrix = data.matrix
+  const bg = (v: number) => {
+    const x = Math.max(-1, Math.min(1, v))
+    const r = x < 0 ? 244 : 34
+    const g = x < 0 ? 67 : 197
+    const b = x < 0 ? 54 : 94
+    const a = Math.abs(x) * 0.9 + 0.1
+    return `rgba(${r}, ${g}, ${b}, ${a})`
+  }
+  return (
+    <div className="w-full overflow-x-auto">
+      <table className="text-xs">
+        <thead>
+          <tr>
+            <th className="w-28" />
+            {labels.map((l) => (
+              <th key={l} className="w-14 px-1 py-1 font-extralight text-neutral-400 text-center truncate">{l}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {labels.map((row, i) => (
+            <tr key={row}>
+              <th className="w-28 px-1 py-1 font-extralight text-neutral-400 text-left truncate">{row}</th>
+              {labels.map((_, j) => (
+                <td key={`${i}-${j}`} className="w-14 h-8 text-center" style={{ background: bg(matrix[i][j]) }}>
+                  <span className="text-[10px] font-extralight text-white/90" style={{ mixBlendMode: 'overlay' }}>{matrix[i][j].toFixed(2)}</span>
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
