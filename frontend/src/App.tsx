@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BrowserRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Route, Routes, useLocation, useNavigate, Navigate } from 'react-router-dom'
+import HomePage from './pages/Home'
+import PipelinePage from './pages/Pipeline'
+import NRRPage from './pages/NRR'
 import { Button } from './components/ui/button'
 import { Label } from './components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
@@ -442,7 +445,11 @@ export function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Onboarding />} />
+        <Route path="/" element={<Navigate to="/home" replace />} />
+        <Route path="/home" element={<HomePage />} />
+        <Route path="/pipeline" element={<PipelinePage />} />
+        <Route path="/nrr" element={<NRRPage />} />
+        <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/analyze" element={<Analyze />} />
       </Routes>
     </BrowserRouter>
